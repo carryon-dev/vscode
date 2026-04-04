@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Package extension
+        run: npx @vscode/vsce package --no-dependencies --no-git-tag-version --no-update-package-json
+
+      - name: Validate package contents
+        run: |
+          npx @vscode/vsce ls --no-dependencies | while IFS= read -r line; do
+            case "$line" in
+              package.json|README.md|LICENSE.md|dist/*|images/*) ;;
+              "") ;;
+              *) echo "ERROR: unexpected file in package: $line"; exit 1 ;;
+            esac
+          done
+          echo "Package contents validated"
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VSIX=$(ls *.vsix)
+          gh release create "$GITHUB_REF_NAME" "$VSIX" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --latest
+
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --no-git-tag-version --no-update-package-json --packagePath $(find . -iname *.vsix)
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        run: npx ovsx publish $(find . -iname *.vsix) -p ${{ secrets.OPEN_VSX_TOKEN }}

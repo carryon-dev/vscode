@@ -1,0 +1,16 @@
+src/**
+__tests__/**
+__mocks__/**
+.github/**
+.vscode/**
+.git/**
+.gitignore
+.vscodeignore
+tsconfig.json
+esbuild.config.ts
+vitest.config.ts
+coverage/**
+test-results/**
+node_modules/**
+dist/**/*.map
+*.vsix

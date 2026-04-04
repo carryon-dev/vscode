@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate package contents
+        run: |
+          npx @vscode/vsce ls --no-dependencies | while IFS= read -r line; do
+            case "$line" in
+              package.json|README.md|LICENSE.md|dist/*|images/*) ;;
+              "") ;;
+              *) echo "ERROR: unexpected file in package: $line"; exit 1 ;;
+            esac
+          done
+          echo "Package contents validated"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage --reporter=default --reporter=junit --outputFile=./test-results/junit.xml
+
+      - name: Test Report
+        if: always() && hashFiles('./test-results/junit.xml') != ''
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: ./test-results/junit.xml
+          comment_title: Tests

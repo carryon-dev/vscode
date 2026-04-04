@@ -1,0 +1,196 @@
+{
+  "name": "carryon",
+  "displayName": "carryOn",
+  "description": "Persistent terminal sessions that survive crashes, reboots, and editor restarts. Access from your local network or anywhere via encrypted relay.",
+  "version": "0.1.0",
+  "publisher": "carryOn",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carryon-dev/vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "terminal",
+    "persistent",
+    "session",
+    "tmux",
+    "remote"
+  ],
+  "icon": "images/icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "terminal": {
+      "profiles": [
+        {
+          "id": "carryon.terminalProfile",
+          "title": "carryOn"
+        }
+      ]
+    },
+    "views": {
+      "carryon": [
+        {
+          "id": "carryon.sessions",
+          "name": "Sessions"
+        },
+        {
+          "id": "carryon.settings",
+          "name": "Settings",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "carryon",
+          "title": "carryOn",
+          "icon": "images/activity-bar.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "carryon.openSession",
+        "title": "Open in Terminal",
+        "icon": "$(terminal)",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.killSession",
+        "title": "Kill Session",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.renameSession",
+        "title": "Rename Session",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.associateSession",
+        "title": "Associate with Workspace",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.detachSession",
+        "title": "Detach from Workspace",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.refreshSessions",
+        "title": "Refresh Sessions",
+        "icon": "$(refresh)",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.openLogs",
+        "title": "Open Logs",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.newSession",
+        "title": "New Session",
+        "icon": "$(plus)",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.newSessionNamed",
+        "title": "New Session...",
+        "category": "carryOn"
+      },
+      {
+        "command": "carryon.changeWebPassword",
+        "title": "Change Web Password",
+        "category": "carryOn"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "carryon.refreshSessions",
+          "when": "view == carryon.sessions",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "carryon.openSession",
+          "when": "view == carryon.sessions && viewItem =~ /^session/ && viewItem != sessionRemoteOffline",
+          "group": "inline"
+        },
+        {
+          "command": "carryon.renameSession",
+          "when": "view == carryon.sessions && (viewItem == sessionAssigned || viewItem == sessionUnassigned)",
+          "group": "1_actions"
+        },
+        {
+          "command": "carryon.killSession",
+          "when": "view == carryon.sessions && (viewItem == sessionAssigned || viewItem == sessionUnassigned)",
+          "group": "2_destructive"
+        },
+        {
+          "command": "carryon.associateSession",
+          "when": "view == carryon.sessions && viewItem == sessionUnassigned",
+          "group": "1_actions"
+        },
+        {
+          "command": "carryon.detachSession",
+          "when": "view == carryon.sessions && viewItem == sessionAssigned",
+          "group": "1_actions"
+        },
+        {
+          "command": "carryon.newSession",
+          "when": "view == carryon.sessions && (viewItem == localGroup || viewItem == group || viewItem == device)",
+          "group": "inline"
+        },
+        {
+          "command": "carryon.newSessionNamed",
+          "when": "view == carryon.sessions && (viewItem == localGroup || viewItem == group || viewItem == device)",
+          "group": "0_create"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "carryOn",
+      "properties": {
+        "carryon.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to the carryon CLI binary. Leave empty to auto-detect from PATH."
+        },
+        "carryon.autoOpenTerminals": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Automatically open declared terminals from .carryon.json on workspace open."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsx esbuild.config.ts",
+    "watch": "tsx esbuild.config.ts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "vscode:prepublish": "npm run build",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
+  }
+}
