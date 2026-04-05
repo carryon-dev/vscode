@@ -1,6 +1,13 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import type { DaemonClient } from "./daemon-client";
 import type { Session } from "./session-browser";
+
+let extensionPath = "";
+
+export function setTerminalExtensionPath(p: string): void {
+  extensionPath = p;
+}
 
 /**
  * Tracks which daemon sessions have open VS Code terminals.
@@ -95,7 +102,7 @@ export class TerminalProfileProvider implements vscode.TerminalProfileProvider {
     }
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const workspaceName = workspaceFolder?.name ?? "carryon";
+    const workspaceName = workspaceFolder?.name ?? "carryOn";
     const cwd = workspaceFolder?.uri.fsPath;
     const name = this.sessionMap.nextName(workspaceName);
 
@@ -113,7 +120,7 @@ export class TerminalProfileProvider implements vscode.TerminalProfileProvider {
         });
       }
 
-      return new vscode.TerminalProfile({
+      const profileOptions: vscode.TerminalOptions = {
         name: session.name,
         shellPath: this.cliPath,
         shellArgs: ["attach", session.id],
@@ -122,7 +129,11 @@ export class TerminalProfileProvider implements vscode.TerminalProfileProvider {
           CARRYON_CLIENT_TYPE: "vscode",
           CARRYON_CLIENT_NAME: vscode.env.appName,
         },
-      });
+      };
+      if (extensionPath) {
+        profileOptions.iconPath = vscode.Uri.file(path.join(extensionPath, "images", "icon.svg"));
+      }
+      return new vscode.TerminalProfile(profileOptions);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`Failed to create carryOn session: ${msg}`);
@@ -174,6 +185,8 @@ export function openSessionInTerminal(
 
   if (options?.icon) {
     terminalOptions.iconPath = new vscode.ThemeIcon(options.icon);
+  } else if (extensionPath) {
+    terminalOptions.iconPath = vscode.Uri.file(path.join(extensionPath, "images", "icon.svg"));
   }
 
   if (options?.location) {

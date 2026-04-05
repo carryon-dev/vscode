@@ -32,7 +32,8 @@
       "profiles": [
         {
           "id": "carryon.terminalProfile",
-          "title": "carryOn"
+          "title": "carryOn",
+          "icon": "chevron-right"
         }
       ]
     },

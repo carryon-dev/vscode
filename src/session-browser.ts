@@ -306,15 +306,12 @@ export function setExtensionPath(p: string): void {
   extensionPath = p;
 }
 
-function sessionIcon(session: Session): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
+function sessionIcon(session: Session): vscode.ThemeIcon | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } {
   if (!session.pid) {
     return new vscode.ThemeIcon("circle-outline");
   }
   if (session.backend === "native" && extensionPath) {
-    return {
-      light: vscode.Uri.file(path.join(extensionPath, "images", "icon-light.svg")),
-      dark: vscode.Uri.file(path.join(extensionPath, "images", "icon-dark.svg")),
-    };
+    return vscode.Uri.file(path.join(extensionPath, "images", "icon.svg"));
   }
   if (session.backend === "tmux") {
     return new vscode.ThemeIcon("terminal-tmux");

@@ -50,7 +50,7 @@ async function createSession(
     if (!input) return; // cancelled
     name = input;
   } else {
-    const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? "carryon";
+    const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? "carryOn";
     name = sessionMap.nextName(workspaceName);
   }
 
