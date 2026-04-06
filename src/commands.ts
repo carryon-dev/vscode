@@ -65,14 +65,6 @@ async function createSession(
 
     const session = await client.call<{ id: string; name: string }>("session.create", params);
 
-    // Auto-associate with project if created from a GroupNode
-    if (projectPath && !deviceId) {
-      await client.call("project.associate", {
-        path: projectPath,
-        sessionId: session.id,
-      });
-    }
-
     // Auto-attach in terminal
     openSessionInTerminal(session.id, session.name, cliPath, sessionMap);
     sessionBrowser.fetchAndRefresh();
@@ -141,46 +133,6 @@ export function registerCommandsAndNotifications(
             const msg = err instanceof Error ? err.message : String(err);
             vscode.window.showErrorMessage(`Failed to rename session: ${msg}`);
           }
-        }
-      }
-    }),
-
-    vscode.commands.registerCommand("carryon.associateSession", async (node: SessionCommandNode) => {
-      if (node instanceof SessionNode) {
-        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!workspacePath) {
-          vscode.window.showWarningMessage("No workspace folder open.");
-          return;
-        }
-        try {
-          await client.call("project.associate", {
-            path: workspacePath,
-            sessionId: node.item.session.id,
-          });
-          sessionBrowser.fetchAndRefresh();
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(`Failed to associate session: ${msg}`);
-        }
-      }
-    }),
-
-    vscode.commands.registerCommand("carryon.detachSession", async (node: SessionCommandNode) => {
-      if (node instanceof SessionNode) {
-        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!workspacePath) {
-          vscode.window.showWarningMessage("No workspace folder open.");
-          return;
-        }
-        try {
-          await client.call("project.disassociate", {
-            path: workspacePath,
-            sessionId: node.item.session.id,
-          });
-          sessionBrowser.fetchAndRefresh();
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(`Failed to detach session: ${msg}`);
         }
       }
     }),

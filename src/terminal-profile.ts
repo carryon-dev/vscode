@@ -112,14 +112,6 @@ export class TerminalProfileProvider implements vscode.TerminalProfileProvider {
         cwd,
       });
 
-      // Associate with workspace if we have one
-      if (cwd) {
-        await this.client.call("project.associate", {
-          path: cwd,
-          sessionId: session.id,
-        });
-      }
-
       const profileOptions: vscode.TerminalOptions = {
         name: session.name,
         shellPath: this.cliPath,
