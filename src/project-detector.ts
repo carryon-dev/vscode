@@ -25,7 +25,7 @@ interface ProjectConfig {
 
 interface ProjectTerminalsResult {
   declared: Array<DeclaredTerminal & { sessionId?: string; running?: boolean }>;
-  associated: Session[];
+  matched: Session[];
 }
 
 /**
@@ -66,7 +66,7 @@ export class ProjectDetector {
     private cliPath: string,
     private sessionMap: SessionTerminalMap,
     private onProjectChanged: () => void,
-  ) {}
+  ) { }
 
   /**
    * Checks all workspace folders for .carryon.json and associated sessions.
@@ -133,17 +133,17 @@ export class ProjectDetector {
       const config = findCarryonConfig(folder.uri.fsPath);
       const autoOpen = vscode.workspace.getConfiguration("carryon", folder.uri).get<boolean>("autoOpenTerminals", false);
 
-      // Get associated sessions that are running and not already reattached
+      // Get cwd-matched sessions that are running and not already reattached
       let needsOpening: Session[] = [];
       try {
         const result = await this.client.call<ProjectTerminalsResult>("project.terminals", {
           path: folder.uri.fsPath,
         });
-        needsOpening = result.associated.filter(
+        needsOpening = result.matched.filter(
           (s) => s.pid && !reattachedSessionIds.has(s.id) && !this.sessionMap.has(s.id),
         );
       } catch {
-        // No associations
+        // No matched sessions
       }
 
       const declaredCount = config?.terminals.reduce(
@@ -154,7 +154,7 @@ export class ProjectDetector {
 
       if (autoOpen) {
         if (config) await this.openDeclaredTerminals(folder.uri.fsPath, config);
-        this.openAssociatedSessions(needsOpening);
+        this.openMatchedSessions(needsOpening);
         continue;
       }
 
@@ -167,7 +167,7 @@ export class ProjectDetector {
 
       if (choice === "Yes" || choice === "Always for this project") {
         if (config) await this.openDeclaredTerminals(folder.uri.fsPath, config);
-        this.openAssociatedSessions(needsOpening);
+        this.openMatchedSessions(needsOpening);
       }
 
       if (choice === "Always for this project") {
@@ -178,9 +178,9 @@ export class ProjectDetector {
   }
 
   /**
-   * Opens associated sessions that are running as VS Code terminal tabs.
+   * Opens matched sessions that are running as VS Code terminal tabs.
    */
-  private openAssociatedSessions(sessions: Session[]): void {
+  private openMatchedSessions(sessions: Session[]): void {
     for (const s of sessions) {
       openSessionInTerminal(s.id, s.name, this.cliPath, this.sessionMap);
     }
@@ -229,10 +229,6 @@ export class ProjectDetector {
                 command: declared.command,
                 shell: declared.shell,
                 backend: declared.backend,
-              });
-              await this.client.call("project.associate", {
-                path: projectPath,
-                sessionId: session.id,
               });
               const term = openSessionInTerminal(
                 session.id, session.name, this.cliPath, this.sessionMap,

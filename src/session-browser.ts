@@ -75,63 +75,67 @@ export interface FullTree {
   teamGroups: TeamGroupItem[];
 }
 
-/** Interface for RPC calls - allows testing with a mock client. */
-export interface RpcCaller {
-  call<T>(method: string, params?: Record<string, unknown>): Promise<T>;
-}
-
 /**
- * Pure function: builds the tree structure from sessions and project associations.
- * Groups by explicit project associations. Unassigned sessions are sub-grouped by cwd.
+ * Pure function: builds the tree structure from sessions using cwd prefix matching.
+ * Sessions are matched to workspace folders by checking if session cwd is at or under
+ * the workspace path. Sessions matching multiple workspaces go to the most specific one.
  * Exported for testing independently of VS Code APIs.
  */
 export function buildTree(
   sessions: Session[],
-  projectMap: Map<string, string[]>,
+  workspacePaths: string[],
   currentWorkspacePath: string | null,
   openSessionIds: Set<string>,
 ): GroupTreeItem[] {
-  const assignedSessionIds = new Set<string>();
   const groups: GroupTreeItem[] = [];
+  const matchedSessionIds = new Set<string>();
 
-  const sessionToProject = new Map<string, string>();
-  for (const [projectPath, sessionIds] of projectMap) {
-    for (const id of sessionIds) {
-      sessionToProject.set(id, projectPath);
+  // Sort workspace paths longest-first so we match most specific first
+  const sortedPaths = [...workspacePaths].sort((a, b) => b.length - a.length);
+
+  // Build workspace path -> sessions map
+  const wsSessionMap = new Map<string, Session[]>();
+  for (const ws of sortedPaths) {
+    wsSessionMap.set(ws, []);
+  }
+
+  for (const s of sessions) {
+    if (!s.cwd || matchedSessionIds.has(s.id)) continue;
+    for (const ws of sortedPaths) {
+      if (isUnderPath(s.cwd, ws)) {
+        wsSessionMap.get(ws)!.push(s);
+        matchedSessionIds.add(s.id);
+        break;
+      }
     }
   }
 
-  const projectPaths = new Set<string>();
-  for (const s of sessions) {
-    const pp = sessionToProject.get(s.id);
-    if (pp) projectPaths.add(pp);
-  }
-
   // Current workspace first
-  if (currentWorkspacePath && projectPaths.has(currentWorkspacePath)) {
-    const projectSessions = sessions.filter((s) => sessionToProject.get(s.id) === currentWorkspacePath);
-    for (const s of projectSessions) assignedSessionIds.add(s.id);
-    groups.push({
-      label: path.basename(currentWorkspacePath),
-      projectPath: currentWorkspacePath,
-      children: projectSessions.map((s) => ({
-        session: s,
-        isOpen: openSessionIds.has(s.id),
-        isAssigned: true,
-      })),
-      isCurrentWorkspace: true,
-    });
-    projectPaths.delete(currentWorkspacePath);
+  if (currentWorkspacePath && wsSessionMap.has(currentWorkspacePath)) {
+    const wsSessions = wsSessionMap.get(currentWorkspacePath)!;
+    if (wsSessions.length > 0) {
+      groups.push({
+        label: path.basename(currentWorkspacePath),
+        projectPath: currentWorkspacePath,
+        children: wsSessions.map((s) => ({
+          session: s,
+          isOpen: openSessionIds.has(s.id),
+          isAssigned: true,
+        })),
+        isCurrentWorkspace: true,
+      });
+    }
   }
 
-  // Other projects
-  for (const pp of projectPaths) {
-    const projectSessions = sessions.filter((s) => sessionToProject.get(s.id) === pp);
-    for (const s of projectSessions) assignedSessionIds.add(s.id);
+  // Other workspace folders
+  for (const ws of sortedPaths) {
+    if (ws === currentWorkspacePath) continue;
+    const wsSessions = wsSessionMap.get(ws)!;
+    if (wsSessions.length === 0) continue;
     groups.push({
-      label: path.basename(pp),
-      projectPath: pp,
-      children: projectSessions.map((s) => ({
+      label: path.basename(ws),
+      projectPath: ws,
+      children: wsSessions.map((s) => ({
         session: s,
         isOpen: openSessionIds.has(s.id),
         isAssigned: true,
@@ -140,46 +144,19 @@ export function buildTree(
     });
   }
 
-  // Unassigned - group by cwd
-  const unassigned = sessions.filter((s) => !assignedSessionIds.has(s.id));
-  if (unassigned.length > 0) {
-    const byCwd = new Map<string, Session[]>();
-    const noCwd: Session[] = [];
-    for (const s of unassigned) {
-      if (s.cwd) {
-        const existing = byCwd.get(s.cwd) ?? [];
-        existing.push(s);
-        byCwd.set(s.cwd, existing);
-      } else {
-        noCwd.push(s);
-      }
-    }
-
-    for (const [cwd, cwdSessions] of byCwd) {
-      groups.push({
-        label: shortenPath(cwd),
-        projectPath: null,
-        children: cwdSessions.map((s) => ({
-          session: s,
-          isOpen: openSessionIds.has(s.id),
-          isAssigned: false,
-        })),
-        isCurrentWorkspace: false,
-      });
-    }
-
-    if (noCwd.length > 0) {
-      groups.push({
-        label: "Other",
-        projectPath: null,
-        children: noCwd.map((s) => ({
-          session: s,
-          isOpen: openSessionIds.has(s.id),
-          isAssigned: false,
-        })),
-        isCurrentWorkspace: false,
-      });
-    }
+  // Unmatched sessions
+  const unmatched = sessions.filter((s) => !matchedSessionIds.has(s.id));
+  if (unmatched.length > 0) {
+    groups.push({
+      label: "Other Sessions",
+      projectPath: null,
+      children: unmatched.map((s) => ({
+        session: s,
+        isOpen: openSessionIds.has(s.id),
+        isAssigned: false,
+      })),
+      isCurrentWorkspace: false,
+    });
   }
 
   return groups;
@@ -192,13 +169,13 @@ export function buildTree(
  */
 export function buildFullTree(
   sessions: Session[],
-  projectMap: Map<string, string[]>,
+  workspacePaths: string[],
   currentWorkspacePath: string | null,
   openSessionIds: Set<string>,
   remoteStatus: RemoteStatus | null,
   devices: DeviceSnapshot[],
 ): FullTree {
-  const localGroups = buildTree(sessions, projectMap, currentWorkspacePath, openSessionIds);
+  const localGroups = buildTree(sessions, workspacePaths, currentWorkspacePath, openSessionIds);
 
   if (!remoteStatus || !remoteStatus.connected) {
     return { localGroups, teamGroups: [] };
@@ -226,36 +203,6 @@ export function buildFullTree(
 }
 
 /**
- * Fetches project associations from the daemon for each workspace path.
- * Exported for testing.
- */
-export async function buildProjectMap(
-  client: RpcCaller,
-  workspacePaths: string[],
-): Promise<Map<string, string[]>> {
-  const projectMap = new Map<string, string[]>();
-  const results = await Promise.all(
-    workspacePaths.map(async (wsPath) => {
-      try {
-        const result = await client.call<{ declared: unknown[]; associated: Session[] }>(
-          "project.terminals",
-          { path: wsPath },
-        );
-        return { wsPath, sessionIds: result.associated.map((s) => s.id) };
-      } catch {
-        return { wsPath, sessionIds: [] as string[] };
-      }
-    }),
-  );
-  for (const { wsPath, sessionIds } of results) {
-    if (sessionIds.length > 0) {
-      projectMap.set(wsPath, sessionIds);
-    }
-  }
-  return projectMap;
-}
-
-/**
  * Strip ANSI/terminal escape sequences and control characters from scrollback output.
  */
 export function stripAnsi(str: string): string {
@@ -278,6 +225,19 @@ export function shortenPath(p: string): string {
     return "~" + p.slice(home.length);
   }
   return p;
+}
+
+/**
+ * Reports whether child path is at or under parent path.
+ * Path-boundary aware: /a/bc is NOT under /a/b.
+ */
+export function isUnderPath(child: string, parent: string): boolean {
+  if (!child || !parent) return false;
+  // Normalize: remove trailing slashes
+  const c = child.replace(/\/+$/, "");
+  const p = parent.replace(/\/+$/, "");
+  if (c === p) return true;
+  return c.startsWith(p + "/");
 }
 
 export function formatAge(epochMs: number): string {
@@ -306,15 +266,12 @@ export function setExtensionPath(p: string): void {
   extensionPath = p;
 }
 
-function sessionIcon(session: Session): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
+function sessionIcon(session: Session): vscode.ThemeIcon | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } {
   if (!session.pid) {
     return new vscode.ThemeIcon("circle-outline");
   }
   if (session.backend === "native" && extensionPath) {
-    return {
-      light: vscode.Uri.file(path.join(extensionPath, "images", "icon-light.svg")),
-      dark: vscode.Uri.file(path.join(extensionPath, "images", "icon-dark.svg")),
-    };
+    return vscode.Uri.file(path.join(extensionPath, "images", "icon.svg"));
   }
   if (session.backend === "tmux") {
     return new vscode.ThemeIcon("terminal-tmux");
@@ -387,7 +344,7 @@ export class SessionNode extends vscode.TreeItem {
   constructor(public readonly item: SessionTreeItem) {
     const s = item.session;
     super(s.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = item.isAssigned ? "sessionAssigned" : "sessionUnassigned";
+    this.contextValue = "session";
     this.id = s.id;
     this.iconPath = sessionIcon(s);
     // tooltip is undefined - resolved lazily via resolveTreeItem
@@ -470,7 +427,7 @@ export class SessionBrowserProvider implements vscode.TreeDataProvider<TreeNode>
   constructor(
     private client: DaemonClient,
     private sessionMap: SessionTerminalMap,
-  ) {}
+  ) { }
 
   dispose(): void {
     if (this.refreshTimeout) {
@@ -630,9 +587,8 @@ export class SessionBrowserProvider implements vscode.TreeDataProvider<TreeNode>
       const workspacePaths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
 
       // Run independent RPC calls in parallel
-      const [sessions, projectMap, remoteStatus] = await Promise.all([
+      const [sessions, remoteStatus] = await Promise.all([
         this.client.call<Session[]>("session.list"),
-        buildProjectMap(this.client, workspacePaths),
         this.client.call<RemoteStatus>("remote.status").catch(() => null),
       ]);
 
@@ -652,7 +608,7 @@ export class SessionBrowserProvider implements vscode.TreeDataProvider<TreeNode>
         }
       }
 
-      const fullTree = buildFullTree(sessions, projectMap, workspacePath, openIds, remoteStatus, devices);
+      const fullTree = buildFullTree(sessions, workspacePaths, workspacePath, openIds, remoteStatus, devices);
       this.refresh(fullTree);
     } catch {
       this.localGroups = [];

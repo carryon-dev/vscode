@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { getBaseDir, getSocketPath } from "./platform";
 import { DaemonClient } from "./daemon-client";
-import { TerminalProfileProvider, SessionTerminalMap } from "./terminal-profile";
+import { TerminalProfileProvider, SessionTerminalMap, setTerminalExtensionPath } from "./terminal-profile";
 import { SessionBrowserProvider, setExtensionPath } from "./session-browser";
 import { ProjectDetector } from "./project-detector";
 import { SettingsWebviewProvider } from "./settings-webview";
@@ -16,6 +16,7 @@ let projectDetector: ProjectDetector;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Set extension path for icon resolution
   setExtensionPath(context.extensionPath);
+  setTerminalExtensionPath(context.extensionPath);
 
   // 1. Detect CLI
   const cliPath = await resolveCliPath();

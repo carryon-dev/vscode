@@ -32,7 +32,8 @@
       "profiles": [
         {
           "id": "carryon.terminalProfile",
-          "title": "carryOn"
+          "title": "carryOn",
+          "icon": "chevron-right"
         }
       ]
     },
@@ -73,16 +74,6 @@
       {
         "command": "carryon.renameSession",
         "title": "Rename Session",
-        "category": "carryOn"
-      },
-      {
-        "command": "carryon.associateSession",
-        "title": "Associate with Workspace",
-        "category": "carryOn"
-      },
-      {
-        "command": "carryon.detachSession",
-        "title": "Detach from Workspace",
         "category": "carryOn"
       },
       {
@@ -129,23 +120,13 @@
         },
         {
           "command": "carryon.renameSession",
-          "when": "view == carryon.sessions && (viewItem == sessionAssigned || viewItem == sessionUnassigned)",
+          "when": "view == carryon.sessions && viewItem == session",
           "group": "1_actions"
         },
         {
           "command": "carryon.killSession",
-          "when": "view == carryon.sessions && (viewItem == sessionAssigned || viewItem == sessionUnassigned)",
+          "when": "view == carryon.sessions && viewItem == session",
           "group": "2_destructive"
-        },
-        {
-          "command": "carryon.associateSession",
-          "when": "view == carryon.sessions && viewItem == sessionUnassigned",
-          "group": "1_actions"
-        },
-        {
-          "command": "carryon.detachSession",
-          "when": "view == carryon.sessions && viewItem == sessionAssigned",
-          "group": "1_actions"
         },
         {
           "command": "carryon.newSession",
